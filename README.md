@@ -188,6 +188,11 @@ var oscPort = new osc.WebSocketPort({
 });
 ```
 
+##### Opening the Port:
+```javascript
+oscPort.open();
+```
+
 ##### Listening for incoming OSC messages:
 ```javascript
 oscPort.on("message", function (oscMsg) {
@@ -197,6 +202,7 @@ oscPort.on("message", function (oscMsg) {
 
 ##### Sending OSC messages:
 ```javascript
+// For most Ports, send() should only be called after the "open" event fires.
 oscPort.send({
     address: "/carrier/frequency",
     args: 440
@@ -276,6 +282,7 @@ var osc = require("osc"),
 // and serve up a directory of static files.
 var app = require("express").express(),
     server = app.listen(8081);
+
 app.use("/", express.static(__dirname + "/static"));
 
 // Listen for Web Socket requests.
@@ -589,7 +596,7 @@ There are two primary functions in osc.js used to read and write OSC data:
         <td><code>osc.readPacket()</code></td>
         <td>Decodes binary OSC message into a tree of JavaScript objects containing the messages or bundles that were read.</td>
         <td>
-            <code>data</code>: A <code>Uint8Array</code> containing the raw data of the OSC packet.; <br />
+            <code>data</code>: A <code>Uint8Array</code> containing the raw data of the OSC packet; <br />
             <code>options</code>: (optional) An options object, described below; <br />
             <code>offsetState</code>: (optional) an offset state object containing an <code>idx</code> property that specifies the offset index into <code>data</code>; <br />
             <code>length</code> the length (in bytes) to read from <code>data</code>

@@ -1,9 +1,9 @@
-/*! osc.js 2.0.3, Copyright 2016 Colin Clark | github.com/colinbdclark/osc.js */
+/*! osc.js 2.1.0, Copyright 2016 Colin Clark | github.com/colinbdclark/osc.js */
 
 /*
  * osc.js: An Open Sound Control library for JavaScript that works in both the browser and Node.js
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
@@ -1318,9 +1318,13 @@ var osc = osc || {};
             throw Error('empty string');
         if (str === "NaN" || str === "Infinity" || str === "+Infinity" || str === "-Infinity")
             return ZERO;
-        if (typeof unsigned === 'number') // For goog.math.long compatibility
+        if (typeof unsigned === 'number') {
+            // For goog.math.long compatibility
             radix = unsigned,
             unsigned = false;
+        } else {
+            unsigned = !! unsigned;
+        }
         radix = radix || 10;
         if (radix < 2 || 36 < radix)
             throw RangeError('radix');
@@ -2013,7 +2017,8 @@ var osc = osc || {};
     LongPrototype.mul = LongPrototype.multiply;
 
     /**
-     * Returns this Long divided by the specified.
+     * Returns this Long divided by the specified. The result is signed if this Long is signed or
+     *  unsigned if this Long is unsigned.
      * @param {!Long|number|string} divisor Divisor
      * @returns {!Long} Quotient
      * @expose
@@ -2026,38 +2031,51 @@ var osc = osc || {};
         if (this.isZero())
             return this.unsigned ? UZERO : ZERO;
         var approx, rem, res;
-        if (this.eq(MIN_VALUE)) {
-            if (divisor.eq(ONE) || divisor.eq(NEG_ONE))
-                return MIN_VALUE;  // recall that -MIN_VALUE == MIN_VALUE
-            else if (divisor.eq(MIN_VALUE))
-                return ONE;
-            else {
-                // At this point, we have |other| >= 2, so |this/other| < |MIN_VALUE|.
-                var halfThis = this.shr(1);
-                approx = halfThis.div(divisor).shl(1);
-                if (approx.eq(ZERO)) {
-                    return divisor.isNegative() ? ONE : NEG_ONE;
-                } else {
-                    rem = this.sub(divisor.mul(approx));
-                    res = approx.add(rem.div(divisor));
-                    return res;
+        if (!this.unsigned) {
+            if (this.eq(MIN_VALUE)) {
+                if (divisor.eq(ONE) || divisor.eq(NEG_ONE))
+                    return MIN_VALUE;  // recall that -MIN_VALUE == MIN_VALUE
+                else if (divisor.eq(MIN_VALUE))
+                    return ONE;
+                else {
+                    // At this point, we have |other| >= 2, so |this/other| < |MIN_VALUE|.
+                    var halfThis = this.shr(1);
+                    approx = halfThis.div(divisor).shl(1);
+                    if (approx.eq(ZERO)) {
+                        return divisor.isNegative() ? ONE : NEG_ONE;
+                    } else {
+                        rem = this.sub(divisor.mul(approx));
+                        res = approx.add(rem.div(divisor));
+                        return res;
+                    }
                 }
-            }
-        } else if (divisor.eq(MIN_VALUE))
-            return this.unsigned ? UZERO : ZERO;
-        if (this.isNegative()) {
-            if (divisor.isNegative())
-                return this.neg().div(divisor.neg());
-            return this.neg().div(divisor).neg();
-        } else if (divisor.isNegative())
-            return this.div(divisor.neg()).neg();
+            } else if (divisor.eq(MIN_VALUE))
+                return this.unsigned ? UZERO : ZERO;
+            if (this.isNegative()) {
+                if (divisor.isNegative())
+                    return this.neg().div(divisor.neg());
+                return this.neg().div(divisor).neg();
+            } else if (divisor.isNegative())
+                return this.div(divisor.neg()).neg();
+        } else if (!divisor.unsigned)
+            divisor = divisor.toUnsigned();
+
+        // The algorithm below has not been made for unsigned longs. It's therefore
+        // required to take special care of the MSB prior to running it.
+        if (this.unsigned) {
+            if (divisor.gt(this))
+                return UZERO;
+            if (divisor.gt(this.shru(1))) // 15 >>> 1 = 7 ; with divisor = 8 ; true
+                return UONE;
+            res = UZERO;
+        } else
+            res = ZERO;
 
         // Repeat the following until the remainder is less than other:  find a
         // floating-point that approximates remainder / other *from below*, add this
         // into the result, and subtract it from the remainder.  It is critical that
         // the approximate value is less than or equal to the real value so that the
         // remainder never becomes negative.
-        res = ZERO;
         rem = this;
         while (rem.gte(divisor)) {
             // Approximate the result of division. This may be a little greater or
@@ -2474,7 +2492,7 @@ var osc = osc || {};
     return slip;
 }));
 ;/*!
- * EventEmitter v4.2.11 - git.io/ee
+ * EventEmitter v5.0.0 - git.io/ee
  * Unlicense - http://unlicense.org/
  * Oliver Caldwell - http://oli.me.uk/
  * @preserve
@@ -2843,9 +2861,8 @@ var osc = osc || {};
         for (key in listenersMap) {
             if (listenersMap.hasOwnProperty(key)) {
                 listeners = listenersMap[key].slice(0);
-                i = listeners.length;
 
-                while (i--) {
+                for (i = 0; i < listeners.length; i++) {
                     // If the listener returns true then it shall be removed from the event
                     // The function is executed either with a basic call or an apply if there is an args array
                     listener = listeners[i];
@@ -2952,7 +2969,7 @@ var osc = osc || {};
  *
  * Cross-platform base transport library for osc.js.
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
@@ -2982,6 +2999,12 @@ var osc = osc || require("./osc.js"),
             var packet = bundle.packets[i];
             osc.firePacketEvents(port, packet, bundle.timeTag, packetInfo);
         }
+    };
+
+    osc.fireClosedPortSendError = function (port, msg) {
+        msg = msg || "Can't send packets on a closed osc.Port object. Please open (or reopen) this Port by calling open().";
+
+        port.emit("error", msg);
     };
 
     osc.Port = function (options) {
@@ -3165,19 +3188,21 @@ var osc = osc || require("./osc.js"),
 ;/*
  * osc.js: An Open Sound Control library for JavaScript that works in both the browser and Node.js
  *
- * Browser transports for osc.js
+ * Cross-Platform Web Socket client transport for osc.js.
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
-/*global WebSocket*/
+/*global WebSocket, require*/
 
-var osc = osc;
+var osc = osc || require("../osc.js");
 
 (function () {
 
     "use strict";
+
+    osc.WebSocket = typeof WebSocket !== "undefined" ? WebSocket : require ("ws");
 
     osc.WebSocketPort = function (options) {
         osc.Port.call(this, options);
@@ -3186,6 +3211,7 @@ var osc = osc;
         this.socket = options.socket;
         if (this.socket) {
             if (this.socket.readyState === 1) {
+                osc.WebSocketPort.setupSocketForBinary(this.socket);
                 this.emit("open", this.socket);
             } else {
                 this.open();
@@ -3197,11 +3223,11 @@ var osc = osc;
     p.constructor = osc.WebSocketPort;
 
     p.open = function () {
-        if (!this.socket) {
-            this.socket = new WebSocket(this.options.url);
+        if (!this.socket || this.socket.readyState > 1) {
+            this.socket = new osc.WebSocket(this.options.url);
         }
 
-        this.socket.binaryType = "arraybuffer";
+        osc.WebSocketPort.setupSocketForBinary(this.socket);
 
         var that = this;
         this.socket.onopen = function () {
@@ -3227,14 +3253,20 @@ var osc = osc;
     };
 
     p.sendRaw = function (encoded) {
-        if (!this.socket) {
+        if (!this.socket || this.socket.readyState !== 1) {
+            osc.fireClosedPortSendError(this);
             return;
         }
+
         this.socket.send(encoded);
     };
 
     p.close = function (code, reason) {
         this.socket.close(code, reason);
+    };
+
+    osc.WebSocketPort.setupSocketForBinary = function (socket) {
+        socket.binaryType = osc.isNode ? "nodebuffer" : "arraybuffer";
     };
 
 }());

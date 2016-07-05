@@ -3,7 +3,7 @@
  *
  * Chrome App transports for osc.js
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
@@ -66,6 +66,7 @@ var osc = osc || {};
 
     p.sendRaw = function (encoded) {
         if (!this.connectionId) {
+            osc.fireClosedPortSendError(this);
             return;
         }
 
@@ -186,6 +187,7 @@ var osc = osc || {};
 
     p.sendRaw = function (encoded, address, port) {
         if (!this.socketId) {
+            osc.fireClosedPortSendError(this);
             return;
         }
 

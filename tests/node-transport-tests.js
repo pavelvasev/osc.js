@@ -3,7 +3,7 @@
  *
  * Node.js Transport Tests
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
@@ -223,17 +223,9 @@ jqUnit.asyncTest("Send OSC messages both directions via a Web Socket", function 
         });
     });
 
-    var wsc = createWSClient(function (msg, timeTag, flags) {
+    var wsc = createWSClient(function (msg) {
         checkMessageReceived(msg, wss, wsc,
             "The message should have been sent to the web socket client.");
-        jqUnit.assertLeftHand(
-            "The web socket flags object should have been supplied",
-            {
-                binary: true,
-                masked: false
-            },
-            flags
-        );
         jqUnit.start();
     });
 

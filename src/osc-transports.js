@@ -3,7 +3,7 @@
  *
  * Cross-platform base transport library for osc.js.
  *
- * Copyright 2014-2015, Colin Clark
+ * Copyright 2014-2016, Colin Clark
  * Licensed under the MIT and GPL 3 licenses.
  */
 
@@ -33,6 +33,12 @@ var osc = osc || require("./osc.js"),
             var packet = bundle.packets[i];
             osc.firePacketEvents(port, packet, bundle.timeTag, packetInfo);
         }
+    };
+
+    osc.fireClosedPortSendError = function (port, msg) {
+        msg = msg || "Can't send packets on a closed osc.Port object. Please open (or reopen) this Port by calling open().";
+
+        port.emit("error", msg);
     };
 
     osc.Port = function (options) {
